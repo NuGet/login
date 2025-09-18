@@ -7,31 +7,7 @@ async function run(): Promise<void> {
         const nugetTokenServiceUrl: string = core.getInput('token-service-url') || 'https://www.nuget.org/api/v2/token';
         const nugetAudience: string = core.getInput('audience') || 'https://www.nuget.org';
 
-        // Get OIDC environment values
-        const oidcRequestToken: string | undefined = process.env['ACTIONS_ID_TOKEN_REQUEST_TOKEN'];
-        const oidcRequestUrl: string | undefined = process.env['ACTIONS_ID_TOKEN_REQUEST_URL'];
-
-        if (!oidcRequestToken || !oidcRequestUrl) {
-            throw new Error('Missing GitHub OIDC request environment variables.');
-        }
-
-        // Mask OIDC tokens and URLs
-        core.setSecret(oidcRequestToken);
-
-        const tokenUrl: string = `${oidcRequestUrl}&audience=${encodeURIComponent(nugetAudience)}`;
-        core.info(`Requesting GitHub OIDC token from: ${tokenUrl}`);
-
-        const http: httpm.HttpClient = new httpm.HttpClient();
-        const tokenResponse = await http.getJson<{ value?: string }>(tokenUrl, {
-            Authorization: `Bearer ${oidcRequestToken}`,
-        });
-
-        if (!tokenResponse.result || !tokenResponse.result.value) {
-            throw new Error('Failed to retrieve OIDC token from GitHub.');
-        }
-
-        const oidcToken: string = tokenResponse.result.value;
-        core.setSecret(oidcToken);
+        const oidcToken: string = await core.getIDToken(nugetAudience);
 
         // Build the request body
         const body: string = JSON.stringify({
