@@ -1,5 +1,5 @@
-name: 'NuGet Login'
-description: 'Log in to NuGet using GitHub OIDC and get a short-lived API key'
+name: 'NetOfficeFw/nuget-login'
+description: 'Authenticate to NuGet.org from GitHub actions using OIDC and get a short-lived API key.'
 
 inputs:
   user:

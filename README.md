@@ -6,7 +6,8 @@ This GitHub Action enables secure, passwordless authentication to NuGet servers 
 
 ```yaml
 - name: NuGet Login
-  uses: NuGet/login@v1
+  uses: NetOfficeFw/nuget-login@v1
+  id: nuget_auth
   with:
     user: my-nuget-username
 ```
@@ -17,7 +18,7 @@ This action outputs a temporary API key as `NUGET_API_KEY` which can be used in 
 - name: Push package
   run: |
     dotnet nuget push mypkg.nupkg \
-      --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" \
+      --api-key "${{ steps.nuget_auth.outputs.NUGET_API_KEY }}" \
       --source https://www.nuget.org/api/v2/package
 ```
 
@@ -34,7 +35,7 @@ This action outputs a temporary API key as `NUGET_API_KEY` which can be used in 
 |--------------------|----------|-------------|
 | `user`             | ✅ Yes   | Your NuGet account username. |
 | `token-service-url`| ❌ No    | URL to your NuGet server's token endpoint (default: `https://www.nuget.org/api/v2/token`) |
-| `audience`         | ❌ No    | OIDC audience (default: `https://www.nuget.org`)   
+| `audience`         | ❌ No    | OIDC audience (default: `https://www.nuget.org`) |
 
 ## 📤 Outputs
 
@@ -59,14 +60,14 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
 
     - name: NuGet Login
-      uses: NuGet/login@v1
-      id: login
+      uses: NetOfficeFw/nuget-login@v1
+      id: nuget_auth
       with:
         user: my-nuget-username
 
     - name: Push package
-      run: dotnet nuget push ./bin/*.nupkg --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://www.nuget.org/api/v2/package
+      run: dotnet nuget push ./bin/*.nupkg --api-key "${{ steps.nuget_auth.outputs.NUGET_API_KEY }}" --source https://www.nuget.org/api/v2/package
 ```

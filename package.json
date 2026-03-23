@@ -1,5 +1,5 @@
 {
-  "name": "nuget-login-action",
+  "name": "@netofficefw/nuget-login-action",
   "version": "1.1.0",
   "main": "dist/index.js",
   "scripts": {
