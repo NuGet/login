@@ -11,15 +11,35 @@ async function run(): Promise<void> {
         const oidcRequestToken: string | undefined = process.env['ACTIONS_ID_TOKEN_REQUEST_TOKEN'];
         const oidcRequestUrl: string | undefined = process.env['ACTIONS_ID_TOKEN_REQUEST_URL'];
 
-        if (!oidcRequestToken || !oidcRequestUrl) {
-            throw new Error('Missing GitHub OIDC request environment variables.');
+        if (!oidcRequestToken && !oidcRequestUrl) {
+            throw new Error(
+                'GitHub OIDC is not available. Ensure your workflow has the required permissions:\n' +
+                '  permissions:\n' +
+                '    id-token: write\n' +
+                '    contents: read'
+            );
         }
 
-        // Mask OIDC tokens and URLs
+        if (!oidcRequestToken) {
+            throw new Error(
+                'ACTIONS_ID_TOKEN_REQUEST_TOKEN is missing. Ensure your workflow has:\n' +
+                '  permissions:\n' +
+                '    id-token: write'
+            );
+        }
+
+        if (!oidcRequestUrl) {
+            throw new Error(
+                'ACTIONS_ID_TOKEN_REQUEST_URL is missing. Ensure your workflow has:\n' +
+                '  permissions:\n' +
+                '    id-token: write'
+            );
+        }
+
+        // Mask OIDC tokens
         core.setSecret(oidcRequestToken);
 
         const tokenUrl: string = `${oidcRequestUrl}&audience=${encodeURIComponent(nugetAudience)}`;
-        core.info(`Requesting GitHub OIDC token from: ${tokenUrl}`);
 
         const http: httpm.HttpClient = new httpm.HttpClient();
         const tokenResponse = await http.getJson<{ value?: string }>(tokenUrl, {
@@ -27,7 +47,10 @@ async function run(): Promise<void> {
         });
 
         if (!tokenResponse.result || !tokenResponse.result.value) {
-            throw new Error('Failed to retrieve OIDC token from GitHub.');
+            throw new Error(
+                `Failed to retrieve OIDC token from GitHub (HTTP ${tokenResponse.statusCode}). ` +
+                'Verify that the audience is correct and that the token service URL is reachable.'
+            );
         }
 
         const oidcToken: string = tokenResponse.result.value;
@@ -51,7 +74,7 @@ async function run(): Promise<void> {
 
         if (response.message.statusCode !== 200) {
             const errorBody = await response.readBody();
-            let errorMessage = `Token exchange failed (${response.message.statusCode})`;
+            let errorMessage = `Token exchange failed (HTTP ${response.message.statusCode}) at ${nugetTokenServiceUrl}. Make sure you are using the username of the policy creator, not the policy owner`;
 
             try {
                 const errorJson = JSON.parse(errorBody);
