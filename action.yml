@@ -19,5 +19,5 @@ outputs:
     description: 'Short-lived NuGet API key'
 
 runs:
-  using: 'node16'
+  using: 'node24'
   main: 'dist/index.js'
