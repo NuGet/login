@@ -1,0 +1,62 @@
+name: Update Node.js version
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 09:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-node:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get latest Node.js LTS version
+        id: node-lts
+        run: |
+          LATEST_LTS=$(curl -s https://nodejs.org/dist/index.json | jq '[.[] | select(.lts != false)] | .[0].version' -r | grep -oP '\d+' | head -1)
+          echo "major=$LATEST_LTS" >> $GITHUB_OUTPUT
+
+      - name: Get current Node.js version from action.yml
+        id: current-node
+        run: |
+          CURRENT=$(grep -oP '(?<=using: .node)\d+' action.yml)
+          echo "major=$CURRENT" >> $GITHUB_OUTPUT
+
+      - name: Update files and open PR
+        if: steps.node-lts.outputs.major != steps.current-node.outputs.major
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_VERSION: ${{ steps.node-lts.outputs.major }}
+          OLD_VERSION: ${{ steps.current-node.outputs.major }}
+        run: |
+          BRANCH="chore/update-node-${NEW_VERSION}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+
+          # Update action.yml
+          sed -i "s/using: 'node[0-9]*/using: 'node${NEW_VERSION}/" action.yml
+
+          # Update package.json
+          sed -i "s/\"node\": \">=.*\"/\"node\": \">=${NEW_VERSION}\"/" package.json
+          sed -i "s/\"@types\/node\": \"\\^[0-9]*/\"@types\/node\": \"\\^${NEW_VERSION}/" package.json
+
+          git add action.yml package.json
+          git commit -m "chore: update action runtime to node${NEW_VERSION}"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "chore: update action runtime to node${NEW_VERSION}" \
+            --body "Automated update of the GitHub Actions Node.js runtime from \`node${OLD_VERSION}\` to \`node${NEW_VERSION}\`.
+
+          **Changes:**
+          - \`action.yml\`: updated \`using\` to \`node${NEW_VERSION}\`
+          - \`package.json\`: updated \`engines.node\` and \`@types/node\`"
