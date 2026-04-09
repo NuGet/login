@@ -2,6 +2,9 @@
   "name": "nuget-login-action",
   "version": "1.0.0",
   "main": "dist/index.js",
+  "engines": {
+    "node": ">=16"
+  },
   "scripts": {
     "build": "ncc build src/index.ts -o dist"
   },
