@@ -5,15 +5,23 @@ on:
     - cron: '0 9 * * 1'  # Every Monday at 09:00 UTC
   workflow_dispatch:
 
-permissions:
-  contents: write
-  pull-requests: write
-
 jobs:
   update-node:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
     steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.AUTOMATION_APP_ID }}
+          private-key: ${{ secrets.AUTOMATION_APP_PEM }}
+
       - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Get latest Node.js LTS version
         id: node-lts
@@ -30,7 +38,7 @@ jobs:
       - name: Update files and open PR
         if: steps.node-lts.outputs.major != steps.current-node.outputs.major
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           NEW_VERSION: ${{ steps.node-lts.outputs.major }}
           OLD_VERSION: ${{ steps.current-node.outputs.major }}
         run: |
@@ -38,6 +46,13 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Skip if branch already exists (e.g. PR is already open)
+          if git ls-remote --exit-code origin "refs/heads/$BRANCH" > /dev/null 2>&1; then
+            echo "Branch $BRANCH already exists, skipping."
+            exit 0
+          fi
+
           git checkout -b "$BRANCH"
 
           # Update action.yml
