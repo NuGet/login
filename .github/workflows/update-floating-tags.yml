@@ -1,0 +1,73 @@
+name: Update Floating Tags
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  update-tags:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Parse version from tag
+        id: version
+        run: |
+          TAG_NAME=${GITHUB_REF#refs/tags/}
+          echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+          
+          # Extract version components (vX.Y.Z -> X, Y, Z)
+          VERSION=${TAG_NAME#v}
+          MAJOR=$(echo $VERSION | cut -d. -f1)
+          MINOR=$(echo $VERSION | cut -d. -f2)
+          
+          echo "major=$MAJOR" >> $GITHUB_OUTPUT
+          echo "minor=$MINOR" >> $GITHUB_OUTPUT
+          echo "major_tag=v$MAJOR" >> $GITHUB_OUTPUT
+          echo "minor_tag=v$MAJOR.$MINOR" >> $GITHUB_OUTPUT
+
+      - name: Update floating tags
+        run: |
+          MAJOR_TAG="${{ steps.version.outputs.major_tag }}"
+          MINOR_TAG="${{ steps.version.outputs.minor_tag }}"
+          FULL_TAG="${{ steps.version.outputs.tag }}"
+          
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Delete existing major tag if it exists
+          if git rev-parse "$MAJOR_TAG" >/dev/null 2>&1; then
+            echo "Deleting existing tag $MAJOR_TAG"
+            git tag -d "$MAJOR_TAG" || true
+            git push origin ":refs/tags/$MAJOR_TAG" || true
+          else
+            echo "Tag $MAJOR_TAG does not exist, skipping deletion"
+          fi
+          
+          # Delete existing minor tag if it exists
+          if git rev-parse "$MINOR_TAG" >/dev/null 2>&1; then
+            echo "Deleting existing tag $MINOR_TAG"
+            git tag -d "$MINOR_TAG" || true
+            git push origin ":refs/tags/$MINOR_TAG" || true
+          else
+            echo "Tag $MINOR_TAG does not exist, skipping deletion"
+          fi
+          
+          # Create new major and minor tags pointing to the same commit as the full tag
+          echo "Creating new tags $MAJOR_TAG and $MINOR_TAG pointing to $FULL_TAG"
+          git tag -a "$MAJOR_TAG" -m "Update $MAJOR_TAG to $FULL_TAG"
+          git tag -a "$MINOR_TAG" -m "Update $MINOR_TAG to $FULL_TAG"
+          
+          # Push the new tags
+          git push origin "$MAJOR_TAG"
+          git push origin "$MINOR_TAG"
+          
+          echo "Successfully updated floating tags"
