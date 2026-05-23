@@ -7,6 +7,15 @@ async function run(): Promise<void> {
         const nugetTokenServiceUrl: string = core.getInput('token-service-url') || 'https://www.nuget.org/api/v2/token';
         const nugetAudience: string = core.getInput('audience') || 'https://www.nuget.org';
 
+        if (!process.env['ACTIONS_ID_TOKEN_REQUEST_TOKEN']) {
+            throw new Error(
+                'GitHub OIDC is not available. Ensure your workflow has the required permissions:\n' +
+                '  permissions:\n' +
+                '    id-token: write\n' +
+                '    contents: read'
+            );
+        }
+
         const oidcToken: string = await core.getIDToken(nugetAudience);
 
         // Build the request body
@@ -27,7 +36,7 @@ async function run(): Promise<void> {
 
         if (response.message.statusCode !== 200) {
             const errorBody = await response.readBody();
-            let errorMessage = `Token exchange failed (${response.message.statusCode})`;
+            let errorMessage = `Token exchange failed (HTTP ${response.message.statusCode}) at ${nugetTokenServiceUrl}. Make sure you are using the username of the policy creator, not the policy owner`;
 
             try {
                 const errorJson = JSON.parse(errorBody);
