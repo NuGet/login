@@ -7,11 +7,7 @@ async function run(): Promise<void> {
         const nugetTokenServiceUrl: string = core.getInput('token-service-url') || 'https://www.nuget.org/api/v2/token';
         const nugetAudience: string = core.getInput('audience') || 'https://www.nuget.org';
 
-        // Get OIDC environment values
-        const oidcRequestToken: string | undefined = process.env['ACTIONS_ID_TOKEN_REQUEST_TOKEN'];
-        const oidcRequestUrl: string | undefined = process.env['ACTIONS_ID_TOKEN_REQUEST_URL'];
-
-        if (!oidcRequestToken && !oidcRequestUrl) {
+        if (!process.env['ACTIONS_ID_TOKEN_REQUEST_TOKEN']) {
             throw new Error(
                 'GitHub OIDC is not available. Ensure your workflow has the required permissions:\n' +
                 '  permissions:\n' +
@@ -20,41 +16,7 @@ async function run(): Promise<void> {
             );
         }
 
-        if (!oidcRequestToken) {
-            throw new Error(
-                'ACTIONS_ID_TOKEN_REQUEST_TOKEN is missing. Ensure your workflow has:\n' +
-                '  permissions:\n' +
-                '    id-token: write'
-            );
-        }
-
-        if (!oidcRequestUrl) {
-            throw new Error(
-                'ACTIONS_ID_TOKEN_REQUEST_URL is missing. Ensure your workflow has:\n' +
-                '  permissions:\n' +
-                '    id-token: write'
-            );
-        }
-
-        // Mask OIDC tokens
-        core.setSecret(oidcRequestToken);
-
-        const tokenUrl: string = `${oidcRequestUrl}&audience=${encodeURIComponent(nugetAudience)}`;
-
-        const http: httpm.HttpClient = new httpm.HttpClient();
-        const tokenResponse = await http.getJson<{ value?: string }>(tokenUrl, {
-            Authorization: `Bearer ${oidcRequestToken}`,
-        });
-
-        if (!tokenResponse.result || !tokenResponse.result.value) {
-            throw new Error(
-                `Failed to retrieve OIDC token from GitHub (HTTP ${tokenResponse.statusCode}). ` +
-                'Verify that the audience is correct and that the token service URL is reachable.'
-            );
-        }
-
-        const oidcToken: string = tokenResponse.result.value;
-        core.setSecret(oidcToken);
+        const oidcToken: string = await core.getIDToken(nugetAudience);
 
         // Build the request body
         const body: string = JSON.stringify({
