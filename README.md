@@ -6,6 +6,7 @@ This GitHub Action enables secure, passwordless authentication to NuGet servers 
 
 ```yaml
 - name: NuGet Login
+  id: login
   uses: NuGet/login@v1
   with:
     user: my-nuget-username
